@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // or mysql / sqlite
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String      @id @default(uuid())
+  name          String
+  email         String      @unique
+  accounts      Account[]
+  transactions  Transaction[] @relation("UserTransactions")
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Account {
+  id         String      @id @default(uuid())
+  user       User        @relation(fields: [userId], references: [id])
+  userId     String
+  type       AccountType
+  bankName   String
+  balance    Decimal     @default(0.0)
+  transactionsFrom Transaction[] @relation("FromAccount")
+  transactionsTo   Transaction[] @relation("ToAccount")
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+model Transaction {
+  id             String           @id @default(uuid())
+  amount         Decimal
+  type           TransactionType
+  category       TransactionCategory
+  fromAccount    Account?         @relation("FromAccount", fields: [fromAccountId], references: [id])
+  fromAccountId  String?
+  toAccount      Account?         @relation("ToAccount", fields: [toAccountId], references: [id])
+  toAccountId    String?
+  user           User             @relation("UserTransactions", fields: [userId], references: [id])
+  userId         String
+  createdAt      DateTime         @default(now())
+}
+
+enum TransactionType {
+  CREDITED
+  DEBITED
+}
+
+enum TransactionCategory {
+  FOOD
+  RENT
+  SALARY
+  SHOPPING
+  TRANSFER
+  UTILITIES
+  ENTERTAINMENT
+  EDUCATION
+  INVESTMENT
+  OTHERS
+}
+
+
+enum AccountType {
+  SAVING
+  CURRENT
+  SALARY
+  FIXED
+}
+
