@@ -5,12 +5,10 @@ import { Decimal } from '@prisma/client/runtime/library';
 const prisma = new PrismaClient();
 
 async function main() {
-  // Delete all existing data
   await prisma.transaction.deleteMany();
   await prisma.account.deleteMany();
   await prisma.user.deleteMany();
 
-  // Create users
   const users = [];
   for (let i = 0; i < 3; i++) {
     const user = await prisma.user.create({
@@ -22,7 +20,6 @@ async function main() {
     users.push(user);
   }
 
-  // Create accounts for each user
   const accounts = [];
   for (const user of users) {
     const numAccounts = faker.number.int({ min: 1, max: 2 });

@@ -15,71 +15,56 @@ linkBankRouter.post("/", async (req, res) => {
   const { name, email } = req.body;
 
   try {
-
-    const existingUser=await prisma.user.findUnique({
-      where:{
-        email:email
-      },
-      include:{
-        accounts:true,
-        transactions:true,
-      }
-      
-    })
-
-    if(existingUser){
-      const token = signToken({ userId: existingUser.id });
-          res.json({
-            user:  existingUser,
-            accounts:existingUser.accounts,
-            transactions:existingUser.transactions,
-            accessToken: token,
-          })
-    }
-    else
-    {
-          const user = await prisma.user.upsert({
+    const existingUser = await prisma.user.findUnique({
       where: { email },
-      update: {},
-      create: { name, email },
+      include: { accounts: true, transactions: true },
     });
 
-    const allAccounts = await prisma.account.findMany();
+    if (existingUser) {
+      const token = signToken({ userId: existingUser.id });
+      return res.json({
+        user: existingUser,
+        accounts: existingUser.accounts,
+        transactions: existingUser.transactions,
+        accessToken: token,
+      });
+    }
 
+    // Create new user
+    const user = await prisma.user.create({
+      data: { name, email },
+    });
+
+    const allAccounts = await prisma.account.findMany(); // for transaction targets
     const accounts = [];
     const transactions = [];
 
-    // 3. Create 1-2 accounts for this user
     for (let i = 0; i < faker.number.int({ min: 1, max: 2 }); i++) {
+      const initialBalance = faker.number.float({
+        min: 1000,
+        max: 100000,
+        precision: 0.01,
+      });
+
       const newAccount = await prisma.account.create({
         data: {
           userId: user.id,
           type: faker.helpers.enumValue(AccountType),
           bankName: faker.company.name(),
-          balance: faker.number.float({
-            min: 1000,
-            max: 100000,
-            precision: 0.01,
-          }),
+          balance: initialBalance,
         },
       });
 
       accounts.push(newAccount);
-
-      // Push new account into allAccounts list (so next txns can send to this as well)
       allAccounts.push(newAccount);
 
-      // 4. Generate 10 transactions per new account
+      let currentBalance = initialBalance;
+
       for (let j = 0; j < 10; j++) {
-        const amount = faker.number.float({
-          min: 100,
-          max: 5000,
-          precision: 0.01,
-        });
+        const amount = faker.number.float({ min: 100, max: 5000, precision: 0.01 });
         const category = faker.helpers.enumValue(TransactionCategory);
         const type = faker.helpers.enumValue(TransactionType);
 
-        // Pick a toAccountId from the existing seeded accounts (not same as from)
         const possibleRecipients = allAccounts.filter(
           (acc) => acc.id !== newAccount.id
         );
@@ -87,7 +72,6 @@ linkBankRouter.post("/", async (req, res) => {
 
         const toAccount = faker.helpers.arrayElement(possibleRecipients);
 
-        // Save transaction
         const tx = await prisma.transaction.create({
           data: {
             amount,
@@ -100,8 +84,18 @@ linkBankRouter.post("/", async (req, res) => {
           },
         });
 
+        // Adjust local balance
+        currentBalance = type === "DEBITED"
+          ? currentBalance - amount
+          : currentBalance + amount;
+
         transactions.push(tx);
       }
+
+      await prisma.account.update({
+        where: { id: newAccount.id },
+        data: { balance: currentBalance },
+      });
     }
 
     const token = signToken({ userId: user.id });
@@ -112,11 +106,10 @@ linkBankRouter.post("/", async (req, res) => {
       transactions,
       accessToken: token,
     });
-      
-    }
   } catch (err) {
     console.error("❌ Error in linkBankRouter:", err);
     res.status(500).json({ error: "Error linking bank" });
   }
 });
+
 export default linkBankRouter;
