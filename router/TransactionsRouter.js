@@ -4,7 +4,6 @@ import { PrismaClient, TransactionType } from '@prisma/client';
 const TransactionsRouter = express.Router();
 const prisma = new PrismaClient();
 
-// Get transactions for an account
 TransactionsRouter.get('/:accountId', async (req, res) => {
   const { accountId } = req.params;
 
@@ -25,7 +24,6 @@ TransactionsRouter.get('/:accountId', async (req, res) => {
   }
 });
 
-// Create a transaction
 TransactionsRouter.post('/', async (req, res) => {
   const userId = req.user?.id;
   const { fromAccountId, toAccountId, amount, category } = req.body;
@@ -45,7 +43,7 @@ TransactionsRouter.post('/', async (req, res) => {
     }
 
     const [updatedFrom, updatedTo, debitTx, creditTx] = await prisma.$transaction([
-      // Update balances
+
       prisma.account.update({
         where: { id: fromAccountId },
         data: { balance: { decrement: amount } },
@@ -55,7 +53,7 @@ TransactionsRouter.post('/', async (req, res) => {
         data: { balance: { increment: amount } },
       }),
 
-      // Create DEBIT transaction for sender
+    
       prisma.transaction.create({
         data: {
           amount,
@@ -67,7 +65,7 @@ TransactionsRouter.post('/', async (req, res) => {
         },
       }),
 
-      // Create CREDIT transaction for receiver
+      
       prisma.transaction.create({
         data: {
           amount,
@@ -75,7 +73,7 @@ TransactionsRouter.post('/', async (req, res) => {
           type: TransactionType.CREDITED,
           fromAccountId,
           toAccountId,
-          userId: to.userId, // credit transaction is recorded under receiver’s userId
+          userId: to.userId,
         },
       }),
     ]);
