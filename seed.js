@@ -5,11 +5,13 @@ import { Decimal } from '@prisma/client/runtime/library';
 const prisma = new PrismaClient();
 
 async function main() {
+  console.log("🔄 Clearing existing data...");
   await prisma.transaction.deleteMany();
   await prisma.account.deleteMany();
   await prisma.user.deleteMany();
 
   const users = [];
+  console.log("👤 Creating users...");
   for (let i = 0; i < 3; i++) {
     const user = await prisma.user.create({
       data: {
@@ -21,6 +23,7 @@ async function main() {
   }
 
   const accounts = [];
+  console.log("🏦 Creating accounts...");
   for (const user of users) {
     const numAccounts = faker.number.int({ min: 1, max: 2 });
     for (let i = 0; i < numAccounts; i++) {
@@ -36,21 +39,30 @@ async function main() {
     }
   }
 
-  // Create transactions between accounts
+  console.log("💸 Creating transactions...");
+  let skipped = 0;
   for (let i = 0; i < 20; i++) {
     const from = faker.helpers.arrayElement(accounts);
     let to = faker.helpers.arrayElement(accounts);
+
     while (to.id === from.id) {
       to = faker.helpers.arrayElement(accounts);
     }
 
     const amount = new Decimal(faker.finance.amount(50, 5000, 2));
+
+    // ❌ Skip if insufficient funds
+    if (from.balance.lessThan(amount)) {
+      skipped++;
+      continue;
+    }
+
     const category = faker.helpers.arrayElement([
       'FOOD', 'RENT', 'SALARY', 'SHOPPING', 'TRANSFER',
       'UTILITIES', 'ENTERTAINMENT', 'EDUCATION', 'INVESTMENT', 'OTHERS',
     ]);
 
-    // Create debit transaction
+    // Create debit transaction (from sender's perspective)
     await prisma.transaction.create({
       data: {
         userId: from.userId,
@@ -62,7 +74,7 @@ async function main() {
       },
     });
 
-    // Create credit transaction
+    // Create credit transaction (to receiver's perspective)
     await prisma.transaction.create({
       data: {
         userId: to.userId,
@@ -89,7 +101,7 @@ async function main() {
     });
   }
 
-  console.log('✅ Seeding complete!');
+  console.log(`✅ Seeding complete! Skipped transactions due to low balance: ${skipped}`);
 }
 
 main()
