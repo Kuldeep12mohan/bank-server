@@ -24,7 +24,15 @@ app.use('/link-bank', linkBankRouter);
 app.use('/accounts',authenticate,accountsRouter);
 app.use('/transactions',authenticate,transactionsRouter);
 
+app.head('/health', (req, res) => {
 
+  res.set({
+    'X-Service-Status': 'ok',
+    'X-Service-Uptime': process.uptime(),
+    'X-Last-Check': new Date().toISOString()
+  });
+  res.status(200).end();
+});
 app.listen(PORT,()=>{
     console.log(`server is running at ${PORT}`)
 })
