@@ -1,13 +1,17 @@
 import { useState } from 'react';
-import AuthPage from './AuthPage';
-import PaymentPage from './PaymentPage';
+import {BrowserRouter as Router,Routes,Route} from "react-router-dom"
+import AuthPage from './components/AuthPage';
+import PaymentPage from './components/PaymentPage';
 
 export default function App() {
-  const [accounts, setAccounts] = useState(null);
 
-  return accounts ? (
-    <PaymentPage accounts={accounts} />
-  ) : (
-    <AuthPage onLogin={setAccounts} />
-  );
+  return(
+    <Router>
+      <Routes>
+        <Route element={<AuthPage/>} path='/'/>
+        <Route element={<PaymentPage/>} path='/payment'/>
+      </Routes>
+    </Router>
+  )
+
 }

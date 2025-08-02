@@ -4,7 +4,7 @@ const AccountsRouter = express.Router();
 const prisma = new PrismaClient();
 
 AccountsRouter.get("/", async (req, res) => {
-  const userId = req.user.id;
+  const userId = req.user.userId;
   const accounts = await prisma.account.findMany({ where: { userId } });
   res.json(accounts);
 });
@@ -16,7 +16,6 @@ AccountsRouter.get("/:accountId", async (req, res) => {
   const account = await prisma.account.findFirst({
     where: {
       id: accountId,
-      userId: req.user.id,
     },
   });
 
@@ -30,7 +29,7 @@ AccountsRouter.get("/:accountId", async (req, res) => {
 
 
 AccountsRouter.get("/others/all", async (req, res) => {
-  const userId = req.user.id;
+  const userId = req.user.userId;
 
   try {
     const accounts = await prisma.account.findMany({

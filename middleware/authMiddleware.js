@@ -8,6 +8,7 @@ export function authenticate(req, res, next) {
 
   try {
     const payload = verifyToken(token);
+    console.log(payload)
     req.user = payload;
     next();
   } catch (err) {
