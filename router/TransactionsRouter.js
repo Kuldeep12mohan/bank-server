@@ -22,28 +22,26 @@ TransactionsRouter.get("/:accountId", async (req, res) => {
 
 TransactionsRouter.post("/", async (req, res) => {
   const userId = req.user.userId;
-  const { fromAccountId, toAccountId, amount, category } = req.body;
+  const { fromAccountId, toAccountId, amount, category,uploadDate} = req.body;
 
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
-
-  if (!amount || amount <= 0) {
-    return res.status(400).json({ error: "Invalid transaction amount" });
-  }
+  if (!amount || amount <= 0) return res.status(400).json({ error: "Invalid transaction amount" });
 
   try {
-    const from = await prisma.account.findUnique({
-      where: { id: fromAccountId },
-    });
-    const to = await prisma.account.findUnique({ where: { id: toAccountId } });
-
-    if (!from || !to || from.balance < amount) {
-      return res
-        .status(400)
-        .json({ error: "Invalid accounts or insufficient balance" });
+    const from = await prisma.account.findUnique({ where: { id: fromAccountId } });
+    if (!from || from.userId !== userId) {
+      return res.status(400).json({ error: "Invalid from account" });
     }
 
-    const [updatedFrom, updatedTo, debitTx, creditTx] =
-      await prisma.$transaction([
+    if (from.balance < amount) {
+      return res.status(400).json({ error: "Insufficient balance" });
+    }
+
+    if (toAccountId) {
+      const to = await prisma.account.findUnique({ where: { id: toAccountId } });
+      if (!to) return res.status(400).json({ error: "Invalid to account" });
+
+      const [updatedFrom, updatedTo, debitTx, creditTx] = await prisma.$transaction([
         prisma.account.update({
           where: { id: fromAccountId },
           data: { balance: { decrement: amount } },
@@ -52,7 +50,6 @@ TransactionsRouter.post("/", async (req, res) => {
           where: { id: toAccountId },
           data: { balance: { increment: amount } },
         }),
-
         prisma.transaction.create({
           data: {
             amount,
@@ -63,28 +60,51 @@ TransactionsRouter.post("/", async (req, res) => {
             userId,
           },
         }),
-
         prisma.transaction.create({
           data: {
             amount,
             category,
             type: TransactionType.CREDITED,
-            fromAccountId:toAccountId,
-            toAccountId:fromAccountId,
+            fromAccountId: toAccountId,
+            toAccountId: fromAccountId,
             userId: to.userId,
           },
         }),
       ]);
 
-    res.json({
-      message: "Transaction successful",
-      debitTransaction: debitTx,
-      creditTransaction: creditTx,
-      updatedBalances: {
-        from: updatedFrom.balance,
-        to: updatedTo.balance,
-      },
-    });
+      return res.json({
+        message: "Transfer successful",
+        debitTransaction: debitTx,
+        creditTransaction: creditTx,
+        updatedBalances: {
+          from: updatedFrom.balance,
+          to: updatedTo.balance,
+        },
+      });
+    } else {
+      const [updatedFrom, expenseTx] = await prisma.$transaction([
+        prisma.account.update({
+          where: { id: fromAccountId },
+          data: { balance: { decrement: amount } },
+        }),
+        prisma.transaction.create({
+          data: {
+            amount,
+            category,
+            type: TransactionType.DEBITED,
+            fromAccountId,
+            userId,
+            createdAt:uploadDate
+          },
+        }),
+      ]);
+
+      return res.json({
+        message: "Expense recorded",
+        transaction: expenseTx,
+        updatedBalance: updatedFrom.balance,
+      });
+    }
   } catch (err) {
     console.error("Transaction error:", err);
     res.status(500).json({ error: "Transaction failed" });
