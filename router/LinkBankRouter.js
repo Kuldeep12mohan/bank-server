@@ -39,7 +39,7 @@ linkBankRouter.post("/", async (req, res) => {
     const accounts = [];
     const transactions = [];
 
-    for (let i = 0; i < faker.number.int({ min: 1, max: 2 }); i++) {
+    for (let i = 0; i < faker.number.int({ min: 2, max: 5}); i++) {
       const initialBalance = faker.number.float({
         min: 1000,
         max: 100000,
